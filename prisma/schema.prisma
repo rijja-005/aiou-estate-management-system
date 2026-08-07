@@ -1,0 +1,921 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                           String                   @id @default(uuid())
+  email                        String                   @unique
+  displayName                  String
+  passwordHash                 String
+  isActive                     Boolean                  @default(true)
+  disabledAt                   DateTime?
+  createdAt                    DateTime                 @default(now())
+  updatedAt                    DateTime                 @updatedAt
+  roles                        UserRole[]
+  permissionOverrides          UserPermissionOverride[]
+  sessions                     Session[]
+  refreshTokenFamilies         RefreshTokenFamily[]
+  refreshTokens                RefreshToken[]
+  passwordResetTokens          PasswordResetToken[]
+  createdAuditLogs             AuditLog[]               @relation("AuditActor")
+  createdBookings              Booking[]                @relation("BookingCreator")
+  bookingDecisions             BookingApproval[]        @relation("BookingApprover")
+  notifications                Notification[]
+  createdAllocations           Allocation[]             @relation("AllocationCreator")
+  allocationDecisions          Allocation[]             @relation("AllocationApprover")
+  allocationHistoryEvents      AllocationHistory[]      @relation("AllocationHistoryActor")
+  createdAgreements            ShopAgreement[]          @relation("AgreementCreator")
+  recordedPayments             Payment[]                @relation("PaymentRecorder")
+  reversedPayments             Payment[]                @relation("PaymentReverser")
+  flatAllocationDecisions      FlatAllocation[]         @relation("FlatAllocationApprover")
+  flatHistoryEvents            FlatAllocationHistory[]  @relation("FlatHistoryActor")
+  approvedRetirementExtensions RetirementExtension[]    @relation("RetirementExtensionApprover")
+  reportJobs                   ReportJob[]
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  description String?
+  isSystem    Boolean          @default(false)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String                   @id @default(uuid())
+  code        String                   @unique
+  module      String
+  action      String
+  description String?
+  isActive    Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  roles       RolePermission[]
+  overrides   UserPermissionOverride[]
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime  @default(now())
+  assignedBy String?
+  expiresAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model UserPermissionOverride {
+  userId       String
+  permissionId String
+  effect       PermissionEffect @default(ALLOW)
+  createdAt    DateTime         @default(now())
+  createdBy    String?
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+}
+
+model Session {
+  id                   String    @id @default(uuid())
+  userId               String
+  refreshTokenFamilyId String
+  csrfTokenHash        String
+  deviceLabel          String?
+  ipAddress            String?
+  userAgent            String?
+  createdAt            DateTime  @default(now())
+  lastUsedAt           DateTime  @default(now())
+  expiresAt            DateTime
+  revokedAt            DateTime?
+  revokedReason        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshTokenFamilyId])
+  @@index([expiresAt])
+}
+
+model RefreshTokenFamily {
+  id         String    @id @default(uuid())
+  userId     String
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+  expiresAt  DateTime
+  lastUsedAt DateTime  @default(now())
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokens RefreshToken[]
+
+  @@index([userId])
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid())
+  userId       String
+  familyId     String
+  tokenHash    String    @unique
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  usedAt       DateTime?
+
+  user   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family RefreshTokenFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuthRateLimit {
+  key             String    @id
+  action          String
+  identifierHash  String
+  windowStartedAt DateTime
+  attemptCount    Int       @default(0)
+  blockedUntil    DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  @@index([action, identifierHash])
+  @@index([blockedUntil])
+}
+
+model Building {
+  id         String     @id @default(uuid())
+  code       String     @unique
+  name       String
+  isEnabled  Boolean    @default(true)
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  deletedAt  DateTime?
+  deletedBy  String?
+  floors     Floor[]
+  properties Property[]
+
+  @@index([name])
+  @@index([isEnabled])
+}
+
+model Floor {
+  id         String     @id @default(uuid())
+  buildingId String
+  code       String
+  name       String
+  sortOrder  Int        @default(0)
+  isEnabled  Boolean    @default(true)
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  deletedAt  DateTime?
+  deletedBy  String?
+  building   Building   @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  properties Property[]
+
+  @@unique([buildingId, code])
+  @@index([buildingId, sortOrder])
+  @@index([isEnabled])
+}
+
+model Department {
+  id          String       @id @default(uuid())
+  code        String       @unique
+  name        String
+  isEnabled   Boolean      @default(true)
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?
+  bookings    Booking[]
+  allocations Allocation[]
+
+  @@index([name])
+  @@index([isEnabled])
+}
+
+model PropertyType {
+  id         String     @id @default(uuid())
+  code       String     @unique
+  name       String
+  category   String
+  isEnabled  Boolean    @default(true)
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  deletedAt  DateTime?
+  deletedBy  String?
+  properties Property[]
+
+  @@index([category])
+  @@index([isEnabled])
+}
+
+model RoomType {
+  id         String     @id @default(uuid())
+  code       String     @unique
+  name       String
+  isEnabled  Boolean    @default(true)
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  deletedAt  DateTime?
+  deletedBy  String?
+  properties Property[]
+
+  @@index([isEnabled])
+}
+
+model Facility {
+  id                 String             @id @default(uuid())
+  code               String             @unique
+  name               String
+  isEnabled          Boolean            @default(true)
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  deletedAt          DateTime?
+  deletedBy          String?
+  propertyFacilities PropertyFacility[]
+
+  @@index([isEnabled])
+}
+
+model Property {
+  id                   String                     @id @default(uuid())
+  propertyCode         String                     @unique
+  displayName          String
+  buildingId           String
+  floorId              String
+  propertyTypeId       String
+  roomTypeId           String?
+  capacity             Int?
+  isPaid               Boolean                    @default(false)
+  operationalStatus    PropertyOperationalStatus
+  availabilityStatus   PropertyAvailabilityStatus
+  occupancyStatus      PropertyOccupancyStatus
+  notes                String?
+  description          String?
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  deletedAt            DateTime?
+  deletedBy            String?
+  building             Building                   @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  floor                Floor                      @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  propertyType         PropertyType               @relation(fields: [propertyTypeId], references: [id], onDelete: Restrict)
+  roomType             RoomType?                  @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  facilities           PropertyFacility[]
+  bookingResources     BookingResource[]
+  closureWindows       ClosureWindow[]
+  allocations          Allocation[]
+  inventoryAssignments PropertyInventory[]
+  shopAgreements       ShopAgreement[]
+  flatDetail           FlatDetail?
+  flatAllocations      FlatAllocation[]
+
+  @@index([buildingId, floorId])
+  @@index([propertyTypeId])
+  @@index([roomTypeId])
+  @@index([operationalStatus, availabilityStatus])
+  @@index([deletedAt])
+}
+
+model PropertyFacility {
+  propertyId String
+  facilityId String
+  createdAt  DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+
+  @@id([propertyId, facilityId])
+  @@index([facilityId])
+}
+
+model Booking {
+  id                     String            @id @default(uuid())
+  referenceNumber        String            @unique
+  requestingDepartmentId String?
+  requesterName          String
+  requesterEmail         String?
+  requesterPhone         String?
+  purpose                String
+  startAt                DateTime
+  endAt                  DateTime
+  attendeeCount          Int               @default(0)
+  isPaid                 Boolean           @default(false)
+  chargeAmount           Decimal?          @db.Decimal(14, 2)
+  status                 BookingStatus     @default(DRAFT)
+  idempotencyKey         String?           @unique
+  rejectionReason        String?
+  cancellationReason     String?
+  notes                  String?
+  createdBy              String
+  updatedBy              String
+  submittedAt            DateTime?
+  completedAt            DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  department             Department?       @relation(fields: [requestingDepartmentId], references: [id], onDelete: Restrict)
+  creator                User              @relation("BookingCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  resources              BookingResource[]
+  approvals              BookingApproval[]
+
+  @@index([status, startAt])
+  @@index([requestingDepartmentId])
+  @@index([createdBy, createdAt])
+}
+
+model BookingResource {
+  id         String        @id @default(uuid())
+  bookingId  String
+  propertyId String
+  startAt    DateTime
+  endAt      DateTime
+  status     BookingStatus
+  createdAt  DateTime      @default(now())
+  booking    Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  property   Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@unique([bookingId, propertyId])
+  @@index([propertyId, startAt, endAt])
+  @@index([status])
+}
+
+model BookingApproval {
+  id          String          @id @default(uuid())
+  bookingId   String
+  actorUserId String
+  decision    BookingDecision
+  remarks     String?
+  createdAt   DateTime        @default(now())
+  booking     Booking         @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  actor       User            @relation("BookingApprover", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId, createdAt])
+}
+
+model ClosureWindow {
+  id         String    @id @default(uuid())
+  propertyId String?
+  startAt    DateTime
+  endAt      DateTime
+  reason     String
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, startAt, endAt])
+}
+
+model Notification {
+  id         String    @id @default(uuid())
+  userId     String
+  type       String
+  title      String
+  message    String
+  entityType String?
+  entityId   String?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model ReportJob {
+  id          String          @id @default(uuid())
+  reportType  String
+  format      String
+  filters     Json?
+  status      ReportJobStatus @default(PENDING)
+  requestedBy String
+  requestedAt DateTime        @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  failedAt    DateTime?
+  error       String?
+  resultData  String?
+  rowCount    Int?
+  requester   User            @relation(fields: [requestedBy], references: [id], onDelete: Restrict)
+
+  @@index([requestedBy, requestedAt])
+  @@index([status, requestedAt])
+}
+
+model ScheduledJobRun {
+  id             String    @id @default(uuid())
+  jobName        String
+  idempotencyKey String    @unique
+  status         String
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  processedCount Int       @default(0)
+  error          String?
+
+  @@index([jobName, startedAt])
+}
+
+model Allocation {
+  id                String              @id @default(uuid())
+  referenceNumber   String              @unique
+  propertyId        String
+  departmentId      String
+  responsiblePerson String?
+  requestDate       DateTime
+  startDate         DateTime?
+  endDate           DateTime?
+  status            AllocationStatus    @default(DRAFT)
+  approvedBy        String?
+  approvedAt        DateTime?
+  notes             String?
+  createdBy         String
+  updatedBy         String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  property          Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  department        Department          @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  creator           User                @relation("AllocationCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  approver          User?               @relation("AllocationApprover", fields: [approvedBy], references: [id], onDelete: Restrict)
+  history           AllocationHistory[]
+
+  @@index([propertyId, status])
+  @@index([departmentId, status])
+  @@index([createdAt])
+}
+
+model AllocationHistory {
+  id                String            @id @default(uuid())
+  allocationId      String
+  fromStatus        AllocationStatus?
+  toStatus          AllocationStatus
+  departmentId      String
+  responsiblePerson String?
+  effectiveAt       DateTime
+  reason            String?
+  actorUserId       String
+  createdAt         DateTime          @default(now())
+  allocation        Allocation        @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+  actor             User              @relation("AllocationHistoryActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([allocationId, createdAt])
+  @@index([departmentId, effectiveAt])
+}
+
+model InventoryItem {
+  id              String              @id @default(uuid())
+  code            String              @unique
+  name            String
+  replacementCost Decimal?            @db.Decimal(14, 2)
+  isEnabled       Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  assignments     PropertyInventory[]
+}
+
+model PropertyInventory {
+  id           String              @id @default(uuid())
+  propertyId   String
+  itemId       String
+  quantity     Int                 @default(1)
+  condition    String
+  serialNumber String?
+  assignedAt   DateTime            @default(now())
+  returnedAt   DateTime?
+  property     Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  item         InventoryItem       @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  movements    InventoryMovement[]
+
+  @@index([propertyId, returnedAt])
+  @@index([itemId])
+}
+
+model InventoryMovement {
+  id                  String            @id @default(uuid())
+  propertyInventoryId String
+  movementType        String
+  quantity            Int
+  condition           String
+  notes               String?
+  actorUserId         String
+  createdAt           DateTime          @default(now())
+  assignment          PropertyInventory @relation(fields: [propertyInventoryId], references: [id], onDelete: Restrict)
+
+  @@index([propertyInventoryId, createdAt])
+}
+
+model ShopTenant {
+  id               String          @id @default(uuid())
+  name             String
+  cnicNormalized   String          @unique
+  phoneNormalized  String
+  email            String?
+  address          String
+  emergencyContact String?
+  isActive         Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  agreements       ShopAgreement[]
+  payments         Payment[]
+
+  @@index([name])
+  @@index([phoneNormalized])
+}
+
+model ShopAgreement {
+  id                      String                 @id @default(uuid())
+  agreementNumber         String                 @unique
+  propertyId              String
+  tenantId                String
+  startDate               DateTime
+  endDate                 DateTime
+  monthlyRent             Decimal                @db.Decimal(14, 2)
+  securityDeposit         Decimal                @db.Decimal(14, 2)
+  gracePeriodDays         Int                    @default(0)
+  lateFeePercent          Decimal                @default(0) @db.Decimal(7, 4)
+  annualEscalationPercent Decimal                @default(0) @db.Decimal(7, 4)
+  status                  AgreementStatus        @default(DRAFT)
+  notes                   String?
+  createdBy               String
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  property                Property               @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  tenant                  ShopTenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  creator                 User                   @relation("AgreementCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  utilityRules            AgreementUtilityRule[]
+  bills                   Bill[]
+
+  @@index([propertyId, status])
+  @@index([tenantId, status])
+  @@index([endDate, status])
+}
+
+model AgreementUtilityRule {
+  id          String        @id @default(uuid())
+  agreementId String
+  utilityType String
+  billingMode String
+  fixedAmount Decimal?      @db.Decimal(14, 2)
+  unitRate    Decimal?      @db.Decimal(14, 4)
+  isEnabled   Boolean       @default(true)
+  agreement   ShopAgreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  @@unique([agreementId, utilityType])
+}
+
+model Bill {
+  id              String              @id @default(uuid())
+  billNumber      String              @unique
+  agreementId     String
+  periodStart     DateTime
+  periodEnd       DateTime
+  issueDate       DateTime
+  dueDate         DateTime
+  status          BillStatus          @default(DRAFT)
+  subtotal        Decimal             @db.Decimal(14, 2)
+  previousArrears Decimal             @default(0) @db.Decimal(14, 2)
+  totalAmount     Decimal             @db.Decimal(14, 2)
+  paidAmount      Decimal             @default(0) @db.Decimal(14, 2)
+  balanceAmount   Decimal             @db.Decimal(14, 2)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  agreement       ShopAgreement       @relation(fields: [agreementId], references: [id], onDelete: Restrict)
+  lines           BillLine[]
+  allocations     PaymentAllocation[]
+
+  @@unique([agreementId, periodStart, periodEnd])
+  @@index([status, dueDate])
+  @@index([agreementId, issueDate])
+}
+
+model BillLine {
+  id          String  @id @default(uuid())
+  billId      String
+  lineType    String
+  description String
+  quantity    Decimal @default(1) @db.Decimal(14, 4)
+  unitAmount  Decimal @db.Decimal(14, 4)
+  amount      Decimal @db.Decimal(14, 2)
+  metadata    Json?
+  bill        Bill    @relation(fields: [billId], references: [id], onDelete: Restrict)
+
+  @@index([billId])
+}
+
+model Payment {
+  id                   String              @id @default(uuid())
+  paymentNumber        String              @unique
+  tenantId             String
+  amount               Decimal             @db.Decimal(14, 2)
+  paymentMethod        String
+  transactionReference String?
+  receivedAt           DateTime
+  status               PaymentStatus       @default(COMPLETED)
+  notes                String?
+  recordedBy           String
+  reversedBy           String?
+  reversedAt           DateTime?
+  reversalReason       String?
+  createdAt            DateTime            @default(now())
+  tenant               ShopTenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  recorder             User                @relation("PaymentRecorder", fields: [recordedBy], references: [id], onDelete: Restrict)
+  reverser             User?               @relation("PaymentReverser", fields: [reversedBy], references: [id], onDelete: Restrict)
+  allocations          PaymentAllocation[]
+  receipt              Receipt?
+
+  @@index([tenantId, receivedAt])
+  @@index([status])
+}
+
+model PaymentAllocation {
+  id        String   @id @default(uuid())
+  paymentId String
+  billId    String
+  amount    Decimal  @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  bill      Bill     @relation(fields: [billId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, billId])
+  @@index([billId])
+}
+
+model Receipt {
+  id            String   @id @default(uuid())
+  receiptNumber String   @unique
+  paymentId     String   @unique
+  generatedAt   DateTime @default(now())
+  payment       Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+}
+
+model EmployeeGrade {
+  id        String     @id @default(uuid())
+  code      String     @unique
+  name      String
+  rank      Int        @unique
+  isEnabled Boolean    @default(true)
+  employees Employee[]
+}
+
+model FlatCategory {
+  id                   String       @id @default(uuid())
+  code                 String       @unique
+  name                 String
+  minimumGradeRank     Int
+  maximumGradeRank     Int
+  expectedInventory    Int
+  postRetirementMonths Int          @default(6)
+  isEnabled            Boolean      @default(true)
+  flats                FlatDetail[]
+}
+
+model Employee {
+  id              String           @id @default(uuid())
+  employeeNumber  String           @unique
+  name            String
+  gradeId         String
+  designation     String
+  departmentId    String
+  phoneNormalized String
+  cnicNormalized  String           @unique
+  retirementDate  DateTime
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  grade           EmployeeGrade    @relation(fields: [gradeId], references: [id], onDelete: Restrict)
+  allocations     FlatAllocation[]
+
+  @@index([departmentId])
+  @@index([retirementDate, isActive])
+  @@index([name])
+}
+
+model FlatDetail {
+  id         String       @id @default(uuid())
+  propertyId String       @unique
+  categoryId String
+  block      String
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  category   FlatCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([categoryId, block])
+}
+
+model FlatAllocation {
+  id                     String                  @id @default(uuid())
+  referenceNumber        String                  @unique
+  propertyId             String
+  employeeId             String
+  status                 FlatAllocationStatus    @default(DRAFT)
+  allocationDate         DateTime
+  approvalDate           DateTime?
+  possessionDate         DateTime?
+  expectedVacationDate   DateTime
+  actualVacationDate     DateTime?
+  retirementDateSnapshot DateTime
+  calculatedVacationDate DateTime
+  approvedBy             String?
+  notes                  String?
+  createdBy              String
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  property               Property                @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  employee               Employee                @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  approver               User?                   @relation("FlatAllocationApprover", fields: [approvedBy], references: [id], onDelete: Restrict)
+  extensions             RetirementExtension[]
+  history                FlatAllocationHistory[]
+
+  @@index([propertyId, status])
+  @@index([employeeId, status])
+  @@index([expectedVacationDate, status])
+}
+
+model RetirementExtension {
+  id                   String         @id @default(uuid())
+  allocationId         String
+  originalVacationDate DateTime
+  revisedVacationDate  DateTime
+  reason               String
+  approvingAuthority   String
+  approvedBy           String
+  approvedAt           DateTime       @default(now())
+  allocation           FlatAllocation @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+  approver             User           @relation("RetirementExtensionApprover", fields: [approvedBy], references: [id], onDelete: Restrict)
+
+  @@index([allocationId, approvedAt])
+}
+
+model FlatAllocationHistory {
+  id                   String                @id @default(uuid())
+  allocationId         String
+  fromStatus           FlatAllocationStatus?
+  toStatus             FlatAllocationStatus
+  propertyId           String
+  employeeId           String
+  effectiveAt          DateTime
+  reason               String?
+  vacationDateSnapshot DateTime
+  actorUserId          String
+  createdAt            DateTime              @default(now())
+  allocation           FlatAllocation        @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+  actor                User                  @relation("FlatHistoryActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([allocationId, createdAt])
+  @@index([employeeId, effectiveAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  requestId   String?
+  ipAddress   String?
+  userAgent   String?
+  beforeData  Json?
+  afterData   Json?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+  @@index([createdAt])
+}
+
+enum PermissionEffect {
+  ALLOW
+  DENY
+}
+
+enum PropertyOperationalStatus {
+  ACTIVE
+  MAINTENANCE
+  INACTIVE
+  ARCHIVED
+}
+
+enum PropertyAvailabilityStatus {
+  AVAILABLE
+  BLOCKED
+  RESERVED
+}
+
+enum PropertyOccupancyStatus {
+  VACANT
+  OCCUPIED
+  PARTIAL
+}
+
+enum ReportJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum BookingStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
+  EXPIRED
+}
+
+enum BookingDecision {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AllocationStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  REASSIGNED
+  VACATED
+  CANCELLED
+}
+
+enum AgreementStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  TERMINATED
+  CANCELLED
+}
+
+enum BillStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+  WRITTEN_OFF
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  REVERSED
+  FAILED
+}
+
+enum FlatAllocationStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  TRANSFERRED
+  VACATED
+  CANCELLED
+}

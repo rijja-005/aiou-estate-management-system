@@ -1,0 +1,2 @@
+import { NextResponse } from 'next/server'; import { requireRequestContext } from '../../../../../server/api/auth-context'; import { errorResponse, successResponse } from '../../../../../server/api/response'; import { financialSummary } from '../../../../../server/shops/service';
+export async function GET():Promise<NextResponse>{try{await requireRequestContext('finance.read');return NextResponse.json(successResponse(await financialSummary()));}catch{return NextResponse.json(errorResponse('REPORT_FAILED','Unable to generate financial summary'),{status:500});}}

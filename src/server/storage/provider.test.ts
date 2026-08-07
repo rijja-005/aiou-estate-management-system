@@ -1,0 +1,2 @@
+import { describe,expect,it } from 'vitest';import { requireProductionStorageConfig } from './provider';
+describe('production storage configuration',()=>{it('requires endpoint and bucket in production',()=>expect(()=>requireProductionStorageConfig({NODE_ENV:'production'})).toThrow());it('accepts configured production storage',()=>expect(()=>requireProductionStorageConfig({NODE_ENV:'production',OBJECT_STORAGE_ENDPOINT:'https://storage.example',OBJECT_STORAGE_BUCKET:'estate'})).not.toThrow());});

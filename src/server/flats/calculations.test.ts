@@ -1,0 +1,2 @@
+import { describe, expect, it } from 'vitest'; import { retirementVacationDate } from './calculations';
+describe('retirement occupancy calculation',()=>{it('adds the default six months',()=>expect(retirementVacationDate(new Date('2026-01-15T00:00:00Z')).toISOString()).toBe('2026-07-15T00:00:00.000Z'));it('clamps end-of-month dates safely',()=>expect(retirementVacationDate(new Date('2025-08-31T00:00:00Z')).toISOString()).toBe('2026-02-28T00:00:00.000Z'));});

@@ -1,0 +1,10 @@
+import { prisma } from '../db/prisma';
+export type SearchResult={type:string;id:string;title:string;subtitle:string;href:string};
+export async function globalSearch(raw:string):Promise<SearchResult[]>{const q=raw.trim().slice(0,100);if(q.length<2)return[];const [properties,bookings,allocations,agreements,bills,employees]=await Promise.all([
+prisma.property.findMany({where:{deletedAt:null,OR:[{propertyCode:{contains:q,mode:'insensitive'}},{displayName:{contains:q,mode:'insensitive'}}]},take:8}),
+prisma.booking.findMany({where:{OR:[{referenceNumber:{contains:q,mode:'insensitive'}},{requesterName:{contains:q,mode:'insensitive'}},{purpose:{contains:q,mode:'insensitive'}}]},take:8}),
+prisma.allocation.findMany({where:{OR:[{referenceNumber:{contains:q,mode:'insensitive'}},{responsiblePerson:{contains:q,mode:'insensitive'}}]},include:{department:true},take:8}),
+prisma.shopAgreement.findMany({where:{OR:[{agreementNumber:{contains:q,mode:'insensitive'}},{tenant:{name:{contains:q,mode:'insensitive'}}}]},include:{tenant:true},take:8}),
+prisma.bill.findMany({where:{billNumber:{contains:q,mode:'insensitive'}},include:{agreement:{include:{tenant:true}}},take:8}),
+prisma.employee.findMany({where:{OR:[{employeeNumber:{contains:q,mode:'insensitive'}},{name:{contains:q,mode:'insensitive'}}]},take:8})]);
+return [...properties.map(x=>({type:'Property',id:x.id,title:x.propertyCode,subtitle:x.displayName,href:'/properties'})),...bookings.map(x=>({type:'Booking',id:x.id,title:x.referenceNumber,subtitle:x.requesterName,href:'/bookings'})),...allocations.map(x=>({type:'Office allocation',id:x.id,title:x.referenceNumber,subtitle:x.department.name,href:'/allocations'})),...agreements.map(x=>({type:'Shop agreement',id:x.id,title:x.agreementNumber,subtitle:x.tenant.name,href:'/shop-billing'})),...bills.map(x=>({type:'Bill',id:x.id,title:x.billNumber,subtitle:x.agreement.tenant.name,href:'/shop-billing'})),...employees.map(x=>({type:'Employee',id:x.id,title:x.employeeNumber,subtitle:x.name,href:'/flats'}))].slice(0,30);}

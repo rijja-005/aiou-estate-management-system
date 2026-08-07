@@ -1,0 +1,2 @@
+import { NextResponse } from 'next/server'; import { requireRequestContext } from '../../../../../server/api/auth-context'; import { errorResponse,successResponse } from '../../../../../server/api/response'; import { dashboardSummary } from '../../../../../server/reports/service';
+export async function GET():Promise<NextResponse>{try{await requireRequestContext('report.read');return NextResponse.json(successResponse(await dashboardSummary()));}catch{return NextResponse.json(errorResponse('DASHBOARD_REPORT_FAILED','Unable to load reporting dashboard'),{status:500});}}
