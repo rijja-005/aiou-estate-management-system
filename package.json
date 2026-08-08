@@ -6,6 +6,7 @@
     "dev": "next dev",
     "postinstall": "prisma generate",
     "build": "next build",
+    "vercel-build": "prisma migrate deploy && npm run seed && next build",
     "start": "next start",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "next typegen && tsc --noEmit",
