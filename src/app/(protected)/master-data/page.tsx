@@ -1,53 +1,19 @@
 'use client';
+import { useCallback,useEffect,useState } from 'react';
+import { Database, Plus } from 'lucide-react';
+import { EmptyState,Field,PageHeader,SearchInput,StatusBadge } from '../../../components/ui';
 
-import { useCallback, useEffect, useState } from 'react';
-
-const resources = ['buildings', 'floors', 'departments', 'property-types', 'room-types', 'facilities'] as const;
-type Resource = typeof resources[number];
-type Row = { id: string; code: string; name: string; category?: string; sortOrder?: number; isEnabled: boolean; building?: { name: string } };
-type Envelope = { success: boolean; data?: Row[]; meta?: { total: number }; error?: { message: string } };
-
-function csrfToken(): string { return decodeURIComponent(document.cookie.split('; ').find((item) => item.startsWith('ems_csrf_token='))?.split('=')[1] ?? ''); }
-
-export default function MasterDataPage(): React.ReactElement {
-  const [resource, setResource] = useState<Resource>('buildings');
-  const [rows, setRows] = useState<Row[]>([]);
-  const [buildings, setBuildings] = useState<Row[]>([]);
-  const [search, setSearch] = useState('');
-  const [message, setMessage] = useState<string>();
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async (): Promise<void> => {
-    const response = await fetch(`/api/v1/master-data/${resource}?pageSize=100&search=${encodeURIComponent(search)}`);
-    const payload = await response.json() as Envelope;
-    setRows(payload.data ?? []); setMessage(response.ok ? undefined : payload.error?.message); setLoading(false);
-  }, [resource, search]);
-
-  useEffect(() => { let active = true; void fetch(`/api/v1/master-data/${resource}?pageSize=100&search=${encodeURIComponent(search)}`).then((response) => response.json() as Promise<Envelope>).then((payload) => { if (active) { setRows(payload.data ?? []); setMessage(payload.error?.message); setLoading(false); } }); return () => { active = false; }; }, [resource, search]);
-  useEffect(() => { void fetch('/api/v1/master-data/buildings?pageSize=100').then((response) => response.json()).then((payload: Envelope) => setBuildings(payload.data ?? [])); }, []);
-
-  async function create(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const body: Record<string, unknown> = { code: form.get('code'), name: form.get('name'), isEnabled: true };
-    if (resource === 'floors') { body.buildingId = form.get('buildingId'); body.sortOrder = Number(form.get('sortOrder') ?? 0); }
-    if (resource === 'property-types') body.category = form.get('category');
-    const response = await fetch(`/api/v1/master-data/${resource}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken() }, body: JSON.stringify(body) });
-    const payload = await response.json() as Envelope;
-    setMessage(response.ok ? 'Record created.' : payload.error?.message ?? 'Unable to create record');
-    if (response.ok) { event.currentTarget.reset(); await load(); }
-  }
-
-  async function archive(id: string): Promise<void> {
-    if (!window.confirm('Archive this record? Historical references will be preserved.')) return;
-    const response = await fetch(`/api/v1/master-data/${resource}/${id}`, { method: 'DELETE', headers: { 'x-csrf-token': csrfToken() } });
-    const payload = await response.json() as Envelope;
-    setMessage(response.ok ? 'Record archived.' : payload.error?.message ?? 'Unable to archive record');
-    if (response.ok) await load();
-  }
-
-  return <div className="space-y-6"><header><h1 className="text-2xl font-semibold">Master data</h1><p className="text-sm text-slate-600 dark:text-slate-300">Manage reusable estate classifications without deleting historical references.</p></header>
-    <div className="flex gap-2 overflow-x-auto pb-2">{resources.map((item) => <button key={item} onClick={() => setResource(item)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${resource === item ? 'bg-red-600 text-white' : 'border bg-white dark:bg-slate-900'}`}>{item.replaceAll('-', ' ')}</button>)}</div>
-    <section className="rounded-2xl border bg-white p-4 shadow-sm dark:bg-slate-900"><form onSubmit={create} className="grid gap-3 md:grid-cols-2 xl:grid-cols-5"><input required name="code" placeholder="Code" className="rounded-lg border bg-transparent px-3 py-2"/><input required name="name" placeholder="Name" className="rounded-lg border bg-transparent px-3 py-2"/>{resource === 'property-types' ? <input required name="category" placeholder="Category" className="rounded-lg border bg-transparent px-3 py-2"/> : null}{resource === 'floors' ? <><select required name="buildingId" className="rounded-lg border bg-transparent px-3 py-2"><option value="">Select building</option>{buildings.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><input name="sortOrder" type="number" min="0" defaultValue="0" className="rounded-lg border bg-transparent px-3 py-2"/></> : null}<button className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white">Add record</button></form>{message ? <p role="status" className="mt-3 text-sm">{message}</p> : null}</section>
-    <section className="overflow-hidden rounded-2xl border bg-white shadow-sm dark:bg-slate-900"><div className="border-b p-4"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search code or name" className="w-full max-w-sm rounded-lg border bg-transparent px-3 py-2"/></div>{loading ? <p className="p-6">Loading…</p> : rows.length === 0 ? <p className="p-6 text-slate-500">No records found.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 dark:bg-slate-800"><tr><th className="p-3">Code</th><th className="p-3">Name</th><th className="p-3">Details</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-t"><td className="p-3 font-medium">{row.code}</td><td className="p-3">{row.name}</td><td className="p-3">{row.building?.name ?? row.category ?? (row.sortOrder ?? '—')}</td><td className="p-3">{row.isEnabled ? 'Enabled' : 'Disabled'}</td><td className="p-3"><button onClick={() => void archive(row.id)} className="text-red-700 hover:underline">Archive</button></td></tr>)}</tbody></table></div>}</section></div>;
+const resources=['buildings','floors','departments','property-types','room-types','facilities'] as const;type Resource=typeof resources[number];type Row={id:string;code:string;name:string;category?:string;sortOrder?:number;isEnabled:boolean;building?:{name:string}};type Envelope={data?:Row[];error?:{message:string}};
+const labels:Record<Resource,string>={buildings:'Buildings',floors:'Floors',departments:'Departments','property-types':'Property types','room-types':'Room types',facilities:'Facilities'};
+function csrfToken(){return decodeURIComponent(document.cookie.split('; ').find(x=>x.startsWith('ems_csrf_token='))?.split('=')[1]??'');}
+export default function MasterDataPage():React.ReactElement{
+ const [resource,setResource]=useState<Resource>('buildings'),[rows,setRows]=useState<Row[]>([]),[buildings,setBuildings]=useState<Row[]>([]),[search,setSearch]=useState(''),[message,setMessage]=useState<string>(),[loading,setLoading]=useState(true);
+ const load=useCallback(async()=>{setLoading(true);const response=await fetch(`/api/v1/master-data/${resource}?pageSize=100&search=${encodeURIComponent(search)}`);const payload=await response.json() as Envelope;setRows(payload.data??[]);setMessage(response.ok?undefined:payload.error?.message);setLoading(false);},[resource,search]);
+ useEffect(()=>{const timer=window.setTimeout(()=>void load(),150);return()=>window.clearTimeout(timer);},[load]);useEffect(()=>{void fetch('/api/v1/master-data/buildings?pageSize=100').then(r=>r.json()).then((p:Envelope)=>setBuildings(p.data??[]));},[]);
+ async function create(event:React.FormEvent<HTMLFormElement>){event.preventDefault();const formElement=event.currentTarget;const form=new FormData(formElement);const body:Record<string,unknown>={code:form.get('code'),name:form.get('name'),isEnabled:true};if(resource==='floors'){body.buildingId=form.get('buildingId');body.sortOrder=Number(form.get('sortOrder')??0);}if(resource==='property-types')body.category=form.get('category');const response=await fetch(`/api/v1/master-data/${resource}`,{method:'POST',headers:{'content-type':'application/json','x-csrf-token':csrfToken()},body:JSON.stringify(body)});const payload=await response.json() as Envelope;setMessage(response.ok?`${labels[resource].slice(0,-1)} added successfully.`:payload.error?.message??'Unable to add record.');if(response.ok){formElement.reset();await load();}}
+ async function archive(id:string){if(!confirm('Archive this record? Historical references will remain available.'))return;const response=await fetch(`/api/v1/master-data/${resource}/${id}`,{method:'DELETE',headers:{'x-csrf-token':csrfToken()}});const payload=await response.json() as Envelope;setMessage(response.ok?'Record archived.':payload.error?.message??'Unable to archive record.');if(response.ok)await load();}
+ return <div className="space-y-7"><PageHeader eyebrow="Configuration" title="Master data" description="Maintain the classifications used throughout the estate system. Archived records remain available to historical transactions."/>
+ <section className="app-card overflow-hidden"><div className="flex gap-1 overflow-x-auto border-b p-2" role="tablist" aria-label="Master data type">{resources.map(item=><button key={item} role="tab" aria-selected={resource===item} onClick={()=>{setResource(item);setSearch('');}} className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold ${resource===item?'bg-[#a71930] text-white shadow-sm':'text-slate-600 hover:bg-slate-100'}`}>{labels[item]}</button>)}</div>
+ <div className="p-5"><div className="mb-5 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-lg bg-[#fff1f3] text-[#a71930]"><Plus size={19}/></span><div><h3 className="font-semibold">Add {labels[resource].toLowerCase().replace(/s$/,'')}</h3><p className="text-sm text-[var(--muted-foreground)]">Complete the required information below.</p></div></div><form onSubmit={create} className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="Code"><input required name="code" placeholder="e.g. MAIN" className="px-3 py-2"/></Field><Field label="Name"><input required name="name" placeholder={`Enter ${labels[resource].toLowerCase().replace(/s$/,'')} name`} className="px-3 py-2"/></Field>{resource==='property-types'?<Field label="Category"><input required name="category" placeholder="e.g. OFFICE" className="px-3 py-2"/></Field>:null}{resource==='floors'?<><Field label="Building"><select required name="buildingId" className="px-3 py-2"><option value="">Choose building</option>{buildings.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Display order"><input name="sortOrder" type="number" min="0" defaultValue="0" className="px-3 py-2"/></Field></>:null}<button className="min-h-11 rounded-lg bg-[#a71930] px-5 py-2 font-semibold text-white hover:bg-[#801226]">Add record</button></form>{message?<p role="status" className="status-message mt-4 text-sm">{message}</p>:null}</div></section>
+ <section className="app-card overflow-hidden"><div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold">{labels[resource]}</h3><p className="text-sm text-[var(--muted-foreground)]">{rows.length} active record{rows.length===1?'':'s'}</p></div><SearchInput value={search} onChange={setSearch} placeholder={`Search ${labels[resource].toLowerCase()}`}/></div>{loading?<div className="p-8 text-center text-sm text-[var(--muted-foreground)]">Loading records…</div>:rows.length===0?<EmptyState title={`No ${labels[resource].toLowerCase()} yet`} description="Use the form above to add the first record. It will then be available across the system."/>:<div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-[var(--surface-muted)]"><tr><th className="px-5 py-3">Code</th><th className="px-5 py-3">Name</th><th className="px-5 py-3">Details</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Action</th></tr></thead><tbody>{rows.map(row=><tr key={row.id} className="border-t"><td className="px-5 py-4 font-mono text-xs font-bold text-[#a71930]">{row.code}</td><td className="px-5 py-4 font-semibold">{row.name}</td><td className="px-5 py-4 text-[var(--muted-foreground)]">{row.building?.name??row.category??row.sortOrder??'—'}</td><td className="px-5 py-4"><StatusBadge value={row.isEnabled?'Enabled':'Disabled'}/></td><td className="px-5 py-4 text-right"><button onClick={()=>void archive(row.id)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-rose-700 hover:bg-rose-50">Archive</button></td></tr>)}</tbody></table></div>}</section></div>;
 }

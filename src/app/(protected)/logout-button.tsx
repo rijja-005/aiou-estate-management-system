@@ -21,5 +21,5 @@ export function LogoutButton(): React.ReactElement {
     }
     setSubmitting(false);
   }
-  return <button type="button" disabled={submitting} onClick={logout} className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60">{submitting ? 'Signing out…' : 'Sign out'}</button>;
+  return <button type="button" disabled={submitting} onClick={logout} className="rounded-lg bg-[#a71930] px-3 py-2 text-sm font-semibold text-white hover:bg-[#801226] disabled:opacity-60">{submitting ? 'Signing out…' : 'Sign out'}</button>;
 }
