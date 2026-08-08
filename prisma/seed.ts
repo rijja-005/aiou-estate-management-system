@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../node_modules/.prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { logger } from '../src/lib/logger';
 import { hashPassword } from '../src/server/auth/password';
 

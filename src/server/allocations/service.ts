@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { Prisma, type AllocationStatus } from '../../../node_modules/.prisma/client';
+import { Prisma, type AllocationStatus } from '@prisma/client';
 import type { ListQuery } from '../api/list-query';
 import { writeAuditLog } from '../audit/service';
 import { prisma } from '../db/prisma';

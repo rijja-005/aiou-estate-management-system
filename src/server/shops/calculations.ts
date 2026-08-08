@@ -1,4 +1,4 @@
-import { Prisma } from '../../../node_modules/.prisma/client';
+import { Prisma } from '@prisma/client';
 export function proratedRent(monthlyRent: Prisma.Decimal.Value, occupiedDays: number, daysInPeriod: number): Prisma.Decimal { if (occupiedDays < 0 || daysInPeriod <= 0 || occupiedDays > daysInPeriod) throw new Error('INVALID_PRORATION_DAYS'); return new Prisma.Decimal(monthlyRent).mul(occupiedDays).div(daysInPeriod).toDecimalPlaces(2); }
 export function calculateLateFee(balance: Prisma.Decimal.Value, percent: Prisma.Decimal.Value): Prisma.Decimal { return new Prisma.Decimal(balance).mul(percent).div(100).toDecimalPlaces(2); }
 export function nextBillStatus(total: Prisma.Decimal.Value, paid: Prisma.Decimal.Value): 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' { const t = new Prisma.Decimal(total); const p = new Prisma.Decimal(paid); return p.greaterThanOrEqualTo(t) ? 'PAID' : p.greaterThan(0) ? 'PARTIALLY_PAID' : 'ISSUED'; }

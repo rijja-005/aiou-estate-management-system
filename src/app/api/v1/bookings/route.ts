@@ -5,7 +5,7 @@ import { errorResponse, successResponse } from '../../../../server/api/response'
 import { validateCsrf } from '../../../../server/auth/csrf';
 import { bookingCreateSchema } from '../../../../server/bookings/schemas';
 import { createBooking, listBookings } from '../../../../server/bookings/service';
-import type { BookingStatus } from '../../../../../node_modules/.prisma/client';
+import type { BookingStatus } from '@prisma/client';
 
 const statuses = new Set<BookingStatus>(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED', 'EXPIRED']);
 export async function GET(request: Request): Promise<NextResponse> {

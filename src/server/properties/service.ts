@@ -1,4 +1,4 @@
-import { Prisma } from '../../../node_modules/.prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../db/prisma';
 import type { ListQuery } from '../api/list-query';
 import { writeAuditLog } from '../audit/service';

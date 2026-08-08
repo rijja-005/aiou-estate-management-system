@@ -1,5 +1,5 @@
 import { prisma } from '../db/prisma';
-import { Prisma } from '../../../node_modules/.prisma/client';
+import { Prisma } from '@prisma/client';
 
 export type AuditInput = {
   actorUserId?: string;
